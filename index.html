@@ -1,0 +1,1873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REST3D: Reconstructing Physically Stable 3D Scenes from a Single Image</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%F0%9F%9B%8B%EF%B8%8F</text></svg>">
+  <style>
+    :root {
+      --max-w: 1280px;
+      --accent: #4a6cf7;
+      --accent-light: #e8edff;
+      --text: #1a1a2e;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --bg-alt: #f8f9fb;
+      --radius: 12px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 62px; }
+    body {
+      font-family: -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      color: var(--text); background: #fff; line-height: 1.65;
+    }
+
+    /* ===== Navbar — fixed, hidden until user scrolls past hero ===== */
+    .navbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      background: rgba(255,255,255,.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      transform: translateY(-100%);
+      transition: transform .35s cubic-bezier(.4,0,.2,1), box-shadow .25s;
+    }
+    .navbar.visible { transform: translateY(0); }
+    .navbar.scrolled { box-shadow: 0 2px 16px rgba(0,0,0,.06); }
+    .nav-inner {
+      max-width: var(--max-w); margin: 0 auto; padding: 12px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo { font-size: 1.05em; font-weight: 700; color: var(--accent); text-decoration: none; cursor: pointer; }
+    .nav-links { display: flex; gap: 4px; }
+    .nav-links a {
+      font-size: 1.1em; color: var(--muted); text-decoration: none;
+      padding: 5px 12px; border-radius: 6px; transition: all .15s;
+    }
+    .nav-links a:hover { color: var(--accent); background: var(--accent-light); }
+
+    /* ===== Banner ===== */
+    .banner {
+      text-align: center; padding: 72px 20px 52px;
+      background: linear-gradient(160deg, #f0f2ff 0%, #e8ecf8 50%, #f5f7ff 100%);
+    }
+    .banner h1 {
+      font-size: 2.8em; font-weight: 800; line-height: 1.1;
+      margin-bottom: 8px; letter-spacing: -.03em;
+    }
+    .banner-subtitle {
+      font-size: 2.4em; font-weight: 600; color: var(--text);
+      line-height: 1.3; margin-bottom: 22px;
+    }
+    .banner .authors {
+      font-size: 1.2em; color: var(--text); margin-bottom: 6px; font-weight: 500;
+    }
+    .banner .authors a { color: var(--accent); text-decoration: none; }
+    .banner .authors a:hover { text-decoration: underline; }
+    .banner .affil {
+      font-size: 1.2em; color: var(--muted); margin-bottom: 22px;
+    }
+    .paper-links { display: flex; justify-content: center; gap:20px; flex-wrap: wrap; }
+    .paper-links a {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 18px; border: 2.5px solid var(--border); border-radius: 999px;
+      color: var(--text); text-decoration: none; font-weight: 500;
+      font-size: 1.1em; background: #fff; transition: all .2s;
+    }
+    .paper-links a:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ===== Container / sections ===== */
+    .container { max-width: var(--max-w); margin: 0 auto; padding: 0 20px; }
+    section { padding: 56px 0; }
+    .section-title { font-size: clamp(1.3em, 1.4vw, 1.9em); font-weight: 700; margin-bottom: clamp(10px, 0.9vw, 18px); }
+    .section-sub { color: var(--muted); margin-bottom: clamp(16px, 1.2vw, 28px); font-size: clamp(0.85em, 0.9vw, 1.05em); }
+    .alt-bg { background: var(--bg-alt); }
+
+    /* ===== Abstract ===== */
+    .abstract-text p {
+      font-size: clamp(0.92em, 0.95vw, 1.15em); text-align: justify; color: #374151;
+      max-width: 1280px; margin: 0 auto;
+    }
+
+    /* ===== TL;DR ===== */
+    .tldr {
+      display: flex; align-items: center; justify-content: center;
+      text-align: center; gap: 14px;
+      background: var(--bg-alt); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 24px; margin: 0 0 24px;
+      font-size: clamp(1.05em, 1.1vw, 1.45em); line-height: 1.5; color: var(--text);
+    }
+    .tldr-icon { font-size: 1.5em; line-height: 1; flex-shrink: 0; }
+    .tldr-label { font-weight: 700; margin-right: 0.35em; }
+    .tldr strong { font-weight: 600; color: var(--text); }
+
+    /* ===== Citation BibTeX block ===== */
+    .bibtex {
+      background: var(--bg-alt); border: 1px solid var(--border);
+      border-radius: 10px; padding: 18px 20px;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+      font-size: 0.88em; line-height: 1.55; color: var(--text);
+      overflow-x: auto; white-space: pre;
+    }
+    .ack-text { font-size: clamp(0.9em, 0.95vw, 1.15em); color: #374151; line-height: 1.65; max-width: 1100px; }
+    .ack-text a { color: var(--accent); text-decoration: none; }
+    .ack-text a:hover { text-decoration: underline; }
+
+    /* ===== Universal rounded video ===== */
+    video { border-radius: var(--radius); display: block; }
+
+    /* ===== Our Results thumb viewer ===== */
+    .viewer { display: grid; grid-template-columns: 1fr; gap: 18px; }
+    .viewer-video-wrap {
+      border-radius: var(--radius); overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,.08); background: #000;
+      position: relative;
+    }
+    .result-loading {
+      position: absolute; inset: 0; z-index: 4;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; background: rgba(0,0,0,.62); border-radius: var(--radius);
+      color: #fff; font-size: 1.1em;
+      pointer-events: none; opacity: 0; transition: opacity .25s;
+    }
+    .result-loading.visible { opacity: 1; }
+    .viewer-video-wrap video { width: 100%; border-radius: var(--radius); }
+    .viewer-caption { padding: 4px 4px 0; color: var(--muted); font-size: .9em; text-align: center; }
+    .thumb-grid {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+    }
+    .thumb {
+      flex: 0 0 130px; position: relative; cursor: pointer; border-radius: 10px;
+      overflow: hidden; aspect-ratio: 4/3;
+      border: 3px solid transparent; transition: all .15s; background: #eee;
+    }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .thumb:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+    .thumb.active { border-color: var(--accent); box-shadow: 0 4px 14px rgba(74,108,247,.25); }
+    .thumb-label {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 4px 8px; font-size: .75em; color: #fff; font-weight: 500;
+      background: linear-gradient(transparent, rgba(0,0,0,.7));
+    }
+
+    /* ===== VR list ===== */
+    .vr-list { display: flex; flex-direction: column; gap: 40px; }
+    .vr-card {
+      border-radius: var(--radius); overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,.08);
+      background: #111; position: relative;
+      min-height: 180px; /* placeholder height while loading */
+    }
+    .vr-card video { width: 100%; border-radius: var(--radius); display: block; }
+    .vr-card-loading {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; background: rgba(0,0,0,.62); color: #fff; font-size: 0.95em;
+      pointer-events: none;
+    }
+    .vr-card-loading .v3d-spinner { width: 30px; height: 30px; border-width: 2px; }
+
+    /* ===== Shared compare-block (SOTA & 3D viewer) ===== */
+
+    .compare-block {
+      display: grid;
+      grid-template-columns: 1fr 1px 1fr 1fr;
+      grid-template-rows: auto auto;
+      grid-template-areas:
+        "img  div  dc   g3d"
+        "ours div  sg   sam";
+      column-gap: 16px; row-gap: 16px;
+    }
+    .compare-divider { grid-area: div; background: var(--border); width: 1px; }
+    .cmp-cell {
+      display: flex; flex-direction: column; border-radius: 10px;
+      overflow: hidden; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.06);
+    }
+    .cmp-cell .cmp-media {
+      aspect-ratio: 16/9; background: #fff;
+      border-radius: 10px 10px 0 0; overflow: hidden; flex-shrink: 0;
+      position: relative;
+    }
+    .cmp-cell .cmp-media video,
+    .cmp-cell .cmp-media img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+      border-radius: 10px 10px 0 0;
+    }
+    /* Input Image is a real photo with arbitrary aspect — fit by long edge with padding instead of cropping. */
+    .cmp-cell.input .cmp-media { background: #fff; }
+    .cmp-cell.input .cmp-media img { object-fit: contain; }
+    .cmp-cell .cmp-media video { transform: scale(1.01); }
+    .cmp-cell .cmp-label {
+      padding: 8px 12px; background: #fff;
+      font-size: .85em; font-weight: 600; color: var(--text);
+      border-top: 1px solid var(--border);
+    }
+    .cmp-cell.ours .cmp-label { background: var(--accent-light); color: var(--accent); }
+    .cmp-cell .empty-media { background: #ececec; display: flex; align-items: center; justify-content: center; }
+    .cmp-cell .cmp-empty-text { color: var(--muted); font-size: .9em; font-weight: 500; text-align: center; padding: 8px 12px; }
+
+    /* ===== Carousel arrows + dots (shared by all three sections) ===== */
+    .cmp-carousel { position: relative; }
+    .cmp-arrow {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      width: 40px; height: 40px; border-radius: 50%;
+      border: none; background: rgba(255,255,255,.92);
+      box-shadow: 0 2px 10px rgba(0,0,0,.12);
+      cursor: pointer; font-size: 1.05em; color: var(--text);
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s, transform .15s; z-index: 5;
+    }
+    .cmp-arrow:hover { background: #fff; transform: translateY(-50%) scale(1.05); }
+    .cmp-arrow.prev { left: -18px; }
+    .cmp-arrow.next { right: -18px; }
+    .cmp-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 18px; }
+    .cmp-dots .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #d1d5db; cursor: pointer; transition: all .2s; border: none;
+    }
+    .cmp-dots .dot.active { background: var(--accent); transform: scale(1.25); }
+
+    /* ===== 3D viewer center loading overlay ===== */
+    #v3d-center-loading {
+      position: absolute; inset: 0; z-index: 30;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(0,0,0,.38); border-radius: var(--radius);
+      color: #fff; font-size: 1.1em; gap: 14px;
+      pointer-events: none; opacity: 0; transition: opacity .25s;
+    }
+    #v3d-center-loading.visible { opacity: 1; }
+    .v3d-spinner {
+      width: 36px; height: 36px; border: 3px solid rgba(255,255,255,.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: v3d-spin .7s linear infinite;
+    }
+    @keyframes v3d-spin { to { transform: rotate(360deg); } }
+
+    /* ===== 3D viewer canvases ===== */
+    .v3d-canvas {
+      width: 100%; height: 100%; display: block;
+      border-radius: 10px 10px 0 0; cursor: zoom-in;
+    }
+    .cmp-cell.v3d-zoomed .v3d-canvas { cursor: zoom-out; }
+    .cmp-cell.v3d-zoomed .v3d-canvas:active { cursor: grabbing; }
+    /* Hide ALL Safari/WebKit native video UI — controls bar and overlay play button */
+    video::-webkit-media-controls                       { display: none !important; }
+    video::-webkit-media-controls-panel                 { display: none !important; }
+    video::-webkit-media-controls-play-button           { display: none !important; }
+    video::-webkit-media-controls-start-playback-button { display: none !important; }
+    video::-webkit-media-controls-overlay-play-button   { display: none !important; }
+    video::-webkit-media-controls-timeline              { display: none !important; }
+    video::-webkit-media-controls-fullscreen-button     { display: none !important; }
+    video::-webkit-media-controls-mute-button           { display: none !important; }
+    video::-webkit-media-controls-volume-slider         { display: none !important; }
+    /* Prevent the compositor-level "tap to play" overlay on Safari iOS/macOS */
+    video { -webkit-tap-highlight-color: transparent; }
+
+    /* pointer-events: none on media content — clicks/hover handled by parent containers. This also prevents Safari's video control overlay from intercepting cursor CSS. */
+    .cmp-media video, .cmp-media img { pointer-events: none; }
+    .viewer-video-wrap video { pointer-events: none; }
+
+    /* SOTA gallery cells: magnifier cursor; click toggles enlarge */
+    #compare-block-mount .cmp-cell .cmp-media { cursor: zoom-in; }
+    #compare-block-mount .cmp-cell.v3d-zoomed .cmp-media { cursor: zoom-out; }
+    /* Interactive viewer's Input Image cell — same click-to-zoom as canvases */
+    #v3d-block .cmp-cell.input .cmp-media { cursor: zoom-in; }
+    #v3d-block .cmp-cell.input.v3d-zoomed .cmp-media { cursor: zoom-out; }
+
+    /* zoomed-panel layout: one cell spans whole grid, others hidden */
+    .compare-block.has-zoom {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto;
+      grid-template-areas: "zoom";
+    }
+    .compare-block.has-zoom > .cmp-cell:not(.v3d-zoomed),
+    .compare-block.has-zoom > .compare-divider { display: none; }
+    /* !important to beat the per-cell inline grid-area (img/ours/dc/...) */
+    .compare-block.has-zoom > .v3d-zoomed { grid-area: zoom !important; }
+    .compare-block.has-zoom > .v3d-zoomed .cmp-media {
+      aspect-ratio: 21/9;
+      display: flex; align-items: center; justify-content: center;  /* center letterboxed content */
+    }
+    /* fit by long edge, pad short edge — never crop */
+    /* fixed-aspect content (img/video) is padded by long edge — never cropped.
+       canvases adapt their aspect via the camera, so let them fill the cell. */
+    .compare-block.has-zoom > .v3d-zoomed .cmp-media video,
+    .compare-block.has-zoom > .v3d-zoomed .cmp-media img { object-fit: contain; }
+
+    /* "Click or ESC to exit" hint badge in zoomed cells */
+    .compare-block.has-zoom > .v3d-zoomed,
+    #v3d-block.has-zoom > .v3d-zoomed { position: relative; }
+    .compare-block.has-zoom > .v3d-zoomed::after,
+    #v3d-block.has-zoom > .v3d-zoomed::after {
+      content: "Click or ESC to exit";
+      position: absolute; top: 10px; right: 12px; z-index: 20;
+      background: rgba(0,0,0,.52); color: #fff;
+      font-size: 0.78em; font-family: inherit; letter-spacing: .02em;
+      padding: 4px 10px; border-radius: 20px;
+      pointer-events: none;
+      opacity: 1;
+    }
+
+    /* 2-row layout for the 3D viewer and the SOTA gallery:
+       row 1 = Input + Ours (half width each); row 2 = 4 baselines (quarter width). */
+    @media (min-width: 761px) {
+      #v3d-block:not(.has-zoom),
+      #compare-block-mount > .compare-block:not(.has-zoom) {
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: auto auto;
+        grid-template-areas:
+          "img img ours ours"
+          "dc  g3d sg   sam";
+      }
+      #v3d-block:not(.has-zoom) > .compare-divider,
+      #compare-block-mount > .compare-block:not(.has-zoom) > .compare-divider { display: none; }
+    }
+
+    /* loading spinner overlay */
+    .v3d-spin {
+      display: none; position: absolute; inset: 0;
+      background: rgba(240,242,245,.82);
+      align-items: center; justify-content: center; z-index: 2;
+    }
+    .v3d-spin.on { display: flex; }
+    .v3d-spin.no-result::after { display: none; }
+    .v3d-spin::after {
+      content: ''; width: 28px; height: 28px; border-radius: 50%;
+      border: 3px solid var(--border); border-top-color: var(--accent);
+      animation: spin3d .7s linear infinite;
+    }
+    @keyframes spin3d { to { transform: rotate(360deg); } }
+
+    /* control bar */
+    .ctrl-bar {
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      margin-bottom: 14px;
+    }
+    .ctrl-bar button {
+      padding: 6px 14px; border: 1.5px solid var(--border); border-radius: 6px;
+      font-size: .88em; background: #fff; cursor: pointer; color: var(--text);
+      transition: all .15s;
+    }
+    .ctrl-bar button:hover { border-color: var(--accent); color: var(--accent); }
+    .ctrl-bar button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .ctrl-bar label { font-size: .85em; color: var(--muted); }
+    .ctrl-bar input[type=range] { width: 90px; accent-color: var(--accent); }
+    .ctrl-bar .spacer { flex: 1; }
+    .ctrl-bar .v3d-status { font-size: .82em; color: var(--muted); }
+
+    /* responsive thumb strip for scene selection (auto-fit → all fit one row) */
+    .v3d-thumb-row {
+      display: grid; gap: 10px; margin-top: 20px; padding: 4px 2px 10px;
+      grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    }
+    /* SOTA gallery strip: exactly 7 per row → 14 cases fill 2 rows */
+    .cmp-thumb-row {
+      display: grid; gap: 10px; margin-top: 22px; padding: 4px 2px 0;
+      grid-template-columns: repeat(7, 1fr);
+    }
+    .v3d-thumb {
+      position: relative; cursor: pointer; width: 100%;
+      border-radius: 10px; overflow: hidden; aspect-ratio: 4/3;
+      border: 3px solid transparent; transition: all .15s; background: #eee;
+    }
+    .v3d-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .v3d-thumb:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+    .v3d-thumb.active { border-color: var(--accent); box-shadow: 0 4px 14px rgba(74,108,247,.25); }
+    .v3d-thumb .thumb-label {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 4px 8px; font-size: .75em; color: #fff; font-weight: 500;
+      background: linear-gradient(transparent, rgba(0,0,0,.7));
+    }
+
+    @media (max-width: 760px) {
+      .compare-divider { display: none; }
+      .cmp-arrow.prev { left: 4px; }
+      .cmp-arrow.next { right: 4px; }
+      /* Interactive 3D + SOTA compare: 2-col layout — Input|Ours on top, 3 rows of baselines */
+      #v3d-block:not(.has-zoom),
+      #compare-block-mount > .compare-block:not(.has-zoom) {
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+          "img  ours"
+          "dc   g3d"
+          "sg   sam";
+      }
+    }
+
+    /* ===== Footer ===== */
+    footer {
+      text-align: center; padding: 36px 20px; color: var(--muted);
+      font-size: .85em; border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 640px) {
+      .banner h1 { font-size: 1.6em; }
+      .nav-logo { font-size: .9em; }
+      .nav-links a { font-size: .78em; padding: 4px 8px; }
+      .thumb-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+    }
+
+    /* ===== Full-screen video hero ===== */
+    .hero {
+      position: relative; width: 100%; height: 100vh;
+      overflow: hidden; display: flex; align-items: center; justify-content: center;
+      background: #18181f;  /* dark fallback while video loads */
+    }
+    .hero-video {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover; border-radius: 0 !important;
+      background: #18181f;
+    }
+    .hero-overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,.48);
+    }
+    .hero-content {
+      position: absolute; z-index: 2;
+      top: 63%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center; color: #fff;
+      padding: 0 2vw; max-width: min(86vw, 2200px); width: 100%;
+    }
+    .hero-content h1 {
+      font-size: clamp(1.8em, 5.5vw, 8em); font-weight: 800;
+      letter-spacing: -.03em; line-height: 1.05; margin-bottom: clamp(8px, 0.8vw, 20px);
+      background: linear-gradient(90deg, #FEAE00 0%, #F071D3 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 2px 12px rgba(0,0,0,.6));
+    }
+    .hero-subtitle {
+      font-size: clamp(1em, 2.8vw, 4.5em); font-weight: 500;
+      opacity: .88; line-height: 1.4; margin-bottom: clamp(10px, 0.9vw, 26px);
+      text-shadow: 0 2px 12px rgba(0,0,0,.65);
+    }
+    .hero-authors {
+      font-size: clamp(0.82em, 1.3vw, 2em); opacity: .85; margin-bottom: clamp(4px, 0.4vw, 10px);
+      text-shadow: 0 1px 8px rgba(0,0,0,.6);
+    }
+    .hero-authors a { color: #a8c4ff; text-decoration: none; }
+    .hero-authors a:hover { text-decoration: underline; }
+    .hero-affil { font-size: clamp(0.82em, 1.3vw, 2em); opacity: .65; margin-bottom: clamp(14px, 1.4vw, 32px); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+    .hero-content .paper-links a {
+      border-color: rgba(255,255,255,.45); color: #fff;
+      background: rgba(255,255,255,.12); backdrop-filter: blur(6px);
+      font-size: clamp(0.8em, 1.1vw, 1.6em);
+      padding: clamp(5px, 0.6vw, 14px) clamp(10px, 1.2vw, 26px);
+    }
+    .hero-content .paper-links a:hover {
+      background: rgba(255,255,255,.26); border-color: rgba(255,255,255,.8);
+      color: #fff;
+    }
+    .hero-scroll {
+      position: absolute; bottom: 2.5vh; left: 50%; transform: translateX(-50%);
+      z-index: 2; color: rgba(255,255,255,.65); font-size: clamp(0.8em, 1vw, 1.4em);
+      display: flex; flex-direction: column; align-items: center; gap: 0.4vw;
+      cursor: pointer; user-select: none;
+      animation: hero-bounce 2.2s ease-in-out infinite;
+    }
+    @keyframes hero-bounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50%       { transform: translateX(-50%) translateY(0.6vh); }
+    }
+    @media (max-width: 640px) {
+      .hero-content h1 { font-size: clamp(1.8em, 8vw, 2.6em); }
+      .hero-subtitle { font-size: clamp(0.9em, 4vw, 1.4em); }
+    }
+
+    /* ===== Carousel slide transition ===== */
+    @keyframes csl-out-l { from{opacity:1;transform:translateX(0) scale(1)}      to{opacity:0;transform:translateX(-72px) scale(.97)} }
+    @keyframes csl-out-r { from{opacity:1;transform:translateX(0) scale(1)}      to{opacity:0;transform:translateX( 72px) scale(.97)} }
+    @keyframes csl-in-r  { from{opacity:0;transform:translateX( 72px) scale(.97)} to{opacity:1;transform:translateX(0) scale(1)} }
+    @keyframes csl-in-l  { from{opacity:0;transform:translateX(-72px) scale(.97)} to{opacity:1;transform:translateX(0) scale(1)} }
+    .csl-out-l { animation: csl-out-l .2s ease-in  both }
+    .csl-out-r { animation: csl-out-r .2s ease-in  both }
+    .csl-in-r  { animation: csl-in-r  .28s ease-out both }
+    .csl-in-l  { animation: csl-in-l  .28s ease-out both }
+
+    /* ===== Interactive 3D ===== */
+    #v3d-play-prompt {
+      position: absolute; inset: 0; z-index: 20;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none; opacity: 0; transition: opacity .3s;
+    }
+    #v3d-play-prompt.visible { opacity: 1; pointer-events: auto; }
+    .v3d-play-btn {
+      background: rgba(0,0,0,.58); color: #fff;
+      border: 2px solid rgba(255,255,255,.6);
+      border-radius: 999px; padding: 22px 56px;
+      font-size: 1.55em; font-weight: 600; letter-spacing: .03em;
+      cursor: pointer; font-family: inherit;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      transition: background .2s, border-color .2s, transform .15s;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .v3d-play-btn:hover {
+      background: rgba(0,0,0,.82); border-color: #fff;
+      transform: scale(1.05);
+    }
+    .v3d-play-btn svg { flex-shrink: 0; }
+    .v3d-play-main { display: block; }
+    .v3d-play-hint { display: block; font-size: .58em; font-weight: 400; opacity: .72; margin-top: 4px; letter-spacing: .02em; }
+
+    /* ===== Per-cell video loading overlay (SOTA compare) ===== */
+    .cmp-video-loading {
+      position: absolute; inset: 0; z-index: 4;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,.62); border-radius: 10px 10px 0 0;
+      pointer-events: none; opacity: 0; transition: opacity .2s;
+    }
+    .cmp-video-loading.visible { opacity: 1; }
+    .cmp-video-loading .v3d-spinner { width: 24px; height: 24px; border-width: 2px; }
+  </style>
+
+  <!-- Preload hero video so it starts immediately, before anything else -->
+  <link rel="preload" as="video" href="videos/hero.mp4" fetchpriority="high">
+  <!-- Warm up CDN connection for Three.js (resolved lazily, DNS ready early) -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+
+<!-- ===== Full-screen video hero ===== -->
+<div class="hero" id="top">
+  <video class="hero-video" src="videos/hero.mp4" autoplay muted loop playsinline preload="auto" disablepictureinpicture x-webkit-airplay="deny"></video>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <h1>REST3D</h1>
+    <p class="hero-subtitle">Reconstructing Physically Stable 3D Scenes from <br> a Single Image</p>
+    <div class="hero-authors">
+      <a href="https://shirleymaxx.github.io/" target="_blank" rel="noopener">Xiaoxuan Ma</a>&nbsp;&nbsp;&nbsp;&nbsp;
+      <a href="https://jiashunwang.github.io/" target="_blank" rel="noopener">Jiashun Wang</a>&nbsp;&nbsp;&nbsp;&nbsp;
+      <a href="https://nicolasugrinovic.github.io/" target="_blank" rel="noopener">Nicol&aacute;s Ugrinovic</a>&nbsp;&nbsp;&nbsp;&nbsp;
+      <a href="https://yehonathanlitman.github.io/" target="_blank" rel="noopener">Yehonathan Litman</a>&nbsp;&nbsp;&nbsp;&nbsp;
+      <a href="https://kriskitani.github.io/" target="_blank" rel="noopener">Kris Kitani</a>
+    </div>
+    <div class="hero-affil">Carnegie Mellon University</div>
+    <div class="paper-links">
+      <a href="#">&#128196; arXiv</a>
+      <a href="https://github.com/ShirleyMaxx/REST3D">&#128187; Code</a>
+      <a href="#interactive">&#127918; Interactive 3D</a>
+    </div>
+  </div>
+  <div class="hero-scroll" onclick="document.getElementById('teaser').scrollIntoView({behavior:'smooth'})">
+    <span>▼</span>
+  </div>
+</div>
+
+<!-- ===== Navbar ===== -->
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a class="nav-logo" href="#top">REST3D</a>
+    <div class="nav-links">
+      <a href="#abstract">Abstract</a>
+      <a href="#interactive">Interactive 3D</a>
+      <a href="#results">Our Results</a>
+      <a href="#vr">VR Demos</a>
+      <a href="#compare">SOTA Comparison</a>
+      <a href="#citation">Citation</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+  <!-- ===== Teaser video ===== -->
+  <section id="teaser" style="padding-bottom:0;">
+    <div class="tldr">
+      <span class="tldr-icon">&#9889;</span>
+      <span><span class="tldr-label">TL;DR</span>From a single casual image to a <strong>visually consistent</strong> and <strong>physically stable</strong> interactive 3D scene.</span>
+    </div>
+    <div class="viewer-video-wrap">
+      <div id="teaser-loading" class="result-loading visible"><div class="v3d-spinner"></div><span>Loading…</span></div>
+      <video id="teaser-video" autoplay loop muted playsinline disablepictureinpicture x-webkit-airplay="deny" preload="none"></video>
+    </div>
+  </section>
+
+  <!-- ===== Abstract ===== -->
+  <section id="abstract">
+    <h2 class="section-title">Abstract</h2>
+    <div class="abstract-text">
+      <p>Reconstructing physically stable 3D scenes from a single RGB image enables casual images to be converted into simulation-ready digital assets for applications such as immersive interaction and content creation. However, existing single-image reconstruction methods fall short in capturing the physical structure of a scene. As a result, they often produce geometrically plausible but physically inconsistent results, including object floating and penetration, which lead to unstable behavior in physics simulations. Image-conditioned scene generation methods improve physical plausibility but often rely on strong scene priors, yielding plausible yet inaccurate object arrangements that fail to match the input image. We propose <strong>REST3D</strong>, a single-image reconstruction framework that can <strong>RE</strong>construct physically <strong>ST</strong>able <strong>3D</strong> scenes by integrating physical scene understanding with physics-constrained refinement. We first introduce an agentic physical scene understanding technique that constructs a scene-tree representation capturing object physical states and inter-object relationships from a gravity-support perspective, providing a structural prior for reconstruction. Leveraging this structure, we initialize the scene using image-to-3D models, followed by scene-tree-guided alignment and physics-constrained optimization to resolve physical violations while preserving visual consistency with the input image. Experiments show that our method significantly reduces physical errors and improves simulation stability on both synthetic and real-world datasets while maintaining strong reconstruction quality. We further demonstrate the reconstructed scenes in VR-based human-object interaction, showing their potential for immersive applications.</p>
+    </div>
+  </section>
+</div>
+
+<!-- ===== Interactive 3D Simulation Replay ===== -->
+<section class="alt-bg" id="interactive">
+  <div class="container">
+    <h2 class="section-title">Interactive 3D Physics Simulation</h2>
+    <p class="section-sub">▸ Explore the physics simulation of reconstructed scenes in Isaac Gym. You can interactively rotate (drag), and zoom in (scroll) 3D to inspect the simulation process. 
+    <br>▸ Due to object interpenetration in baseline methods, applying gravity in the physics simulator cause objects to explosively separate and become unstable.
+    <br>▸ All methods are synchronized for comparison. Scene loading may take some time. </p>
+
+    <!-- Shared playback controls -->
+    <div class="ctrl-bar">
+      <button id="v3d-play">&#9654; Play</button>
+      <button id="v3d-reset">&#8635; Reset</button>
+      <div class="spacer"></div>
+      <label>Speed</label>
+      <input type="range" id="v3d-speed" min="0.25" max="3" step="0.25" value="1">
+      <span class="v3d-status" id="v3d-loadmsg"></span>
+    </div>
+
+    <!-- Compare grid: same layout as SOTA, canvases instead of videos -->
+    <div class="cmp-carousel">
+    <button class="cmp-arrow prev" id="v3d-prev" aria-label="Previous">&#10094;</button>
+    <button class="cmp-arrow next" id="v3d-next" aria-label="Next">&#10095;</button>
+    <div class="compare-block" id="v3d-block" style="position:relative">
+      <div id="v3d-center-loading"><div class="v3d-spinner"></div><span>Loading scene…</span></div>
+      <div id="v3d-play-prompt">
+        <button class="v3d-play-btn" id="v3d-play-prompt-btn">
+          <span>
+            <span class="v3d-play-main"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:6px"><path d="M8 5v14l11-7z"/></svg>Run Simulation</span>
+            <span class="v3d-play-hint">Click or press Space</span>
+          </span>
+        </button>
+      </div>
+      <!-- Input image (static, changes per scene) -->
+      <div class="cmp-cell input" style="grid-area:img">
+        <div class="cmp-media">
+          <img id="v3d-input-img" src="" alt="Input Image">
+        </div>
+        <div class="cmp-label">Input Image</div>
+      </div>
+      <div class="compare-divider"></div>
+
+      <!-- Ours -->
+      <div class="cmp-cell ours" style="grid-area:ours">
+        <div class="cmp-media">
+          <canvas id="v3d-ours" class="v3d-canvas"></canvas>
+          <div class="v3d-spin" id="spin-ours"></div>
+        </div>
+        <div class="cmp-label">Ours</div>
+      </div>
+
+      <!-- DC -->
+      <div class="cmp-cell" style="grid-area:dc">
+        <div class="cmp-media">
+          <canvas id="v3d-dc" class="v3d-canvas"></canvas>
+          <div class="v3d-spin" id="spin-dc"></div>
+        </div>
+        <div class="cmp-label">DigitalCousins</div>
+      </div>
+
+      <!-- Gen3DSR -->
+      <div class="cmp-cell" style="grid-area:g3d">
+        <div class="cmp-media">
+          <canvas id="v3d-g3d" class="v3d-canvas"></canvas>
+          <div class="v3d-spin" id="spin-g3d"></div>
+        </div>
+        <div class="cmp-label">Gen3DSR</div>
+      </div>
+
+      <!-- SceneGen -->
+      <div class="cmp-cell" style="grid-area:sg">
+        <div class="cmp-media">
+          <canvas id="v3d-sg" class="v3d-canvas"></canvas>
+          <div class="v3d-spin" id="spin-sg"></div>
+        </div>
+        <div class="cmp-label">SceneGen</div>
+      </div>
+
+      <!-- SAM3D -->
+      <div class="cmp-cell" style="grid-area:sam">
+        <div class="cmp-media">
+          <canvas id="v3d-sam3d" class="v3d-canvas"></canvas>
+          <div class="v3d-spin" id="spin-sam3d"></div>
+        </div>
+        <div class="cmp-label">SAM3D</div>
+      </div>
+    </div>
+    </div>
+    <div class="cmp-dots" id="v3d-dots"></div>
+
+    <!-- Scene selector: horizontal image strip -->
+    <div class="v3d-thumb-row" id="v3d-thumb-row"></div>
+  </div>
+</section>
+
+<!-- ===== Our Results ===== -->
+<section id="results">
+  <div class="container">
+    <h2 class="section-title">Our Results</h2>
+    <p class="section-sub">▸ High-resolution video showing physics simulation of reconstructed scenes in Isaac Gym. 
+    <br>▸ Objects are placed sequentially for clarity and then simulated jointly. 
+    <br>▸ Our reconstructed scenes are simulation-ready which quickly settle into stable states.</p>
+    <div class="viewer">
+      <div class="cmp-carousel">
+        <button class="cmp-arrow prev" id="result-prev" aria-label="Previous">&#10094;</button>
+        <div class="viewer-video-wrap">
+          <div id="result-loading" class="result-loading"><div class="v3d-spinner"></div><span>Loading…</span></div>
+          <video id="result-video" preload="metadata" autoplay loop muted playsinline disablepictureinpicture x-webkit-airplay="deny"></video>
+        </div>
+        <button class="cmp-arrow next" id="result-next" aria-label="Next">&#10095;</button>
+      </div>
+      <div class="viewer-caption" id="result-caption"></div>
+      <div class="cmp-dots" id="result-dots"></div>
+      <div class="thumb-grid" id="thumb-grid"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== VR videos ===== -->
+<section class="alt-bg" id="vr">
+  <div class="container">
+    <h2 class="section-title">Real-world VR Interaction</h2>
+    <p class="section-sub">We implemented an interactive VR system that reconstructs an immersive and physically grounded 3D scene from a single image, enabling users to naturally interact with stable virtual objects through hand-based interactions. Recorded with Meta Quest Pro and played back at 3× speed.</p>
+    <div class="vr-list" id="vr-list"></div>
+  </div>
+</section>
+
+<!-- ===== SOTA comparison ===== -->
+<section id="compare">
+  <div class="container">
+    <h2 class="section-title">Comparison with SOTA Methods</h2>
+    <p class="section-sub">▸ Video of physics simulation of reconstructed scenes in Isaac Gym, with comparison against SOTA single-image 3D reconstruction methods. 
+    <br>▸ Objects are placed sequentially for clarity and then simulated jointly. 
+    <br>▸ Existing methods struggle to balance reconstruction fidelity and physical stability, whereas our method produces stable, simulation-ready scenes that quickly settle with only minor adjustments.</p>
+    <div class="cmp-carousel">
+      <button class="cmp-arrow prev" id="cmp-prev" aria-label="Previous">&#10094;</button>
+      <div id="compare-block-mount"></div>
+      <button class="cmp-arrow next" id="cmp-next" aria-label="Next">&#10095;</button>
+    </div>
+    <div class="cmp-dots" id="cmp-dots"></div>
+    <div class="cmp-thumb-row" id="compare-thumb-row"></div>
+  </div>
+</section>
+
+<!-- ===== Citation ===== -->
+<section id="citation" class="alt-bg">
+  <div class="container">
+    <h2 class="section-title">Citation</h2>
+    <pre class="bibtex"><code>@inproceedings{ma2026rest3d,
+  title     = {REST3D: Reconstructing Physically Stable 3D Scenes from a Single Image},
+  author    = {Ma, Xiaoxuan and Wang, Jiashun and Ugrinovic, Nicol\'{a}s and Litman, Yehonathan and Kitani, Kris},
+  booktitle = {arXiv preprint arXiv:},
+  year      = {2026}
+}</code></pre>
+  </div>
+</section>
+
+<!-- ===== Acknowledgement ===== -->
+<section id="acknowledgement">
+  <div class="container">
+    <h2 class="section-title">Acknowledgement</h2>
+    <p class="ack-text">
+      The authors would like to thank
+      <a href="https://yuxuank.com/" target="_blank" rel="noopener">Yuxuan Kuang</a>,
+      <a href="https://yufeiwang63.github.io/" target="_blank" rel="noopener">Yufei Wang</a>, and
+      <a href="https://maxwelljon.es/" target="_blank" rel="noopener">Maxwell Jones</a>
+      for their insightful discussions.
+    </p>
+  </div>
+</section>
+
+<footer>REST3D: Reconstructing Physically Stable 3D Scenes from a Single Image</footer>
+
+<!-- ===== Regular scripts ===== -->
+<script>
+// Navbar (critical — must be immediate so scroll works from frame 0)
+const navbar = document.getElementById('navbar');
+const heroEl = document.getElementById('top');
+function _updateNavbar() {
+  const pastHero = window.scrollY >= heroEl.offsetHeight - 10;
+  navbar.classList.toggle('visible',  pastHero);
+  navbar.classList.toggle('scrolled', pastHero);
+}
+window.addEventListener('scroll', _updateNavbar, { passive: true });
+_updateNavbar();
+
+// Hero video: force-play immediately. Safari will not autoplay via HTML attribute alone.
+// Must call .play() from JS. Retry on any user gesture if blocked.
+(function() {
+  const v = document.querySelector('.hero-video');
+  if (!v) return;
+  function tryPlay() { v.play().catch(() => {}); }
+  // Attempt immediately; if DOM hasn't loaded the video yet, also try on loadedmetadata
+  tryPlay();
+  v.addEventListener('loadedmetadata', tryPlay, { once: true });
+  // Fallback: retry on first user gesture (Safari may require interaction in some cases)
+  ['click','touchstart','keydown'].forEach(function(ev) {
+    document.addEventListener(ev, tryPlay, { once: true, passive: true });
+  });
+})();
+
+// Everything below is non-critical setup — defer past first paint
+setTimeout(function() {
+
+// ---- Our Results ----
+const ourResults = [
+  { id: "custom_cartoon_simpson",        name: "Simpson Room", img: "custom_cartoon_simpson.jpeg" },
+  { id: "custom_room0",                  name: "Room 0",       img: "custom_room0.jpg" },
+  { id: "custom_room1",                  name: "Room 1",       img: "custom_room1.jpeg" },
+  { id: "custom_room2",                  name: "Room 2",       img: "custom_room2.jpg" },
+  { id: "replica_scan6_000013_rgb",      name: "Replica",      img: "replica_scan6_000013_rgb.jpg" },
+  { id: "scannetpp_08bbbdcc3d_DSC01130", name: "ScanNet++",    img: "scannetpp_08bbbdcc3d_DSC01130.jpeg" },
+];
+const thumbGrid = document.getElementById('thumb-grid');
+const resultVideo = document.getElementById('result-video');
+const resultCaption = document.getElementById('result-caption');
+const resultDots = document.getElementById('result-dots');
+// ---- Carousel slide transition helper ----
+function carouselSlide(el, dir, updateFn) {
+  if (dir === 0) { updateFn(); return; }
+  const outCls = dir >= 0 ? 'csl-out-l' : 'csl-out-r';
+  const inCls  = dir >= 0 ? 'csl-in-r'  : 'csl-in-l';
+  el.classList.add(outCls);
+  setTimeout(() => {
+    el.classList.remove(outCls);
+    el.style.opacity = '0';  // hold at 0 this frame
+    updateFn();
+    requestAnimationFrame(() => {  // next frame: compositor has seen opacity:0, safe to start in-animation
+      el.style.opacity = '';
+      el.classList.add(inCls);
+      setTimeout(() => el.classList.remove(inCls), 300);
+    });
+  }, 200);
+}
+
+// ---- Carousel auto-advance ----
+// Only runs while the section is on-screen. Pauses when off-screen, resets to 0 on re-entry.
+let _resultAutoT = null, _cmpAutoT = null;
+let _resultUserFlipped = false, _cmpUserFlipped = false;
+let _resultVisible = false, _cmpVisible = false;
+let _cmpLoading = false;
+function _resultAutoArm() {
+  clearTimeout(_resultAutoT); _resultAutoT = null;
+  if (!_resultVisible) return;
+  _resultAutoT = setTimeout(() => selectResult(resultIdx + 1, 1), _resultUserFlipped ? 30000 : 10000);
+}
+function _cmpAutoArm() {
+  clearTimeout(_cmpAutoT); _cmpAutoT = null;
+  if (!_cmpVisible) return;
+  if (_cmpLoading) return;
+  if (cmpMount.querySelector('.v3d-zoomed')) return;
+  _cmpAutoT = setTimeout(() => renderCompare(cmpIdx + 1, 1), _cmpUserFlipped ? 30000 : 10000);
+}
+
+let resultIdx = 0;
+function selectResult(idx, dir) {
+  const prevIdx = resultIdx;
+  resultIdx = ((idx % ourResults.length) + ourResults.length) % ourResults.length;
+  const d = dir !== undefined ? Math.sign(dir) : (resultIdx !== prevIdx ? (resultIdx > prevIdx ? 1 : -1) : 1);
+  thumbGrid.querySelectorAll('.thumb').forEach((el, i) => el.classList.toggle('active', i === resultIdx));
+  resultDots.querySelectorAll('.dot').forEach((el, i) => el.classList.toggle('active', i === resultIdx));
+  const wrap = document.querySelector('#results .viewer-video-wrap');
+  const _rl = document.getElementById('result-loading');
+  function _swapContent() {
+    _rl.classList.add('visible');
+    resultVideo.src = `videos/our_video_results/${ourResults[resultIdx].id}_ours.mp4`;
+    resultVideo.addEventListener('canplay', () => _rl.classList.remove('visible'), { once: true });
+    resultVideo.play().catch(() => {});
+    resultCaption.textContent = ourResults[resultIdx].name;
+  }
+  if (d === 0) { _swapContent(); _resultAutoArm(); return; }
+  // Use inline style + transition (not CSS animation class) — video elements have their own
+  // compositing layer; CSS animation on the parent can't reliably hide them, causing flashes.
+  wrap.style.transition = '';
+  wrap.style.opacity = '0';
+  wrap.style.transform = `translateX(${d >= 0 ? '-72px' : '72px'}) scale(.97)`;
+  setTimeout(() => {
+    _swapContent();
+    wrap.style.transform = `translateX(${d >= 0 ? '72px' : '-72px'}) scale(.97)`;
+    requestAnimationFrame(() => {
+      wrap.style.transition = 'opacity .28s ease-out, transform .28s ease-out';
+      wrap.style.opacity = '';
+      wrap.style.transform = '';
+      setTimeout(() => { wrap.style.transition = ''; }, 280);
+    });
+  }, 200);
+  _resultAutoArm();
+}
+function resultNav(dir) { _resultUserFlipped = true; selectResult(resultIdx + dir, dir); }
+document.getElementById('result-prev').addEventListener('click', () => resultNav(-1));
+document.getElementById('result-next').addEventListener('click', () => resultNav(1));
+document.addEventListener('keydown', e => {
+  const rect = document.getElementById('results').getBoundingClientRect();
+  if (rect.top < window.innerHeight * .7 && rect.bottom > 0) {
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); resultNav(-1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); resultNav(1); }
+  }
+});
+ourResults.forEach((r, i) => {
+  const div = document.createElement('div');
+  div.className = 'thumb' + (i === 0 ? ' active' : '');
+  div.innerHTML = `<img src="videos/images/${r.img}" alt="${r.name}" loading="lazy"><div class="thumb-label">${r.name}</div>`;
+  div.onclick = () => { _resultUserFlipped = true; selectResult(i); };
+  thumbGrid.appendChild(div);
+  const dot = document.createElement('button');
+  dot.className = 'dot' + (i === 0 ? ' active' : '');
+  dot.setAttribute('aria-label', `Go to ${r.name}`);
+  dot.onclick = () => { _resultUserFlipped = true; selectResult(i); };
+  resultDots.appendChild(dot);
+});
+// Lazy-load teaser video when the teaser section approaches viewport
+{ const tv = document.getElementById('teaser-video');
+  const tl = document.getElementById('teaser-loading');
+  if (tv) { let _done = false;
+    new IntersectionObserver(es => {
+      if (es[0].isIntersecting && !_done) {
+        _done = true;
+        tv.src = 'videos/teaser.mp4';
+        tv.load();
+        tv.addEventListener('canplay', () => { if (tl) tl.classList.remove('visible'); }, { once: true });
+        tv.play().catch(() => {});
+      }
+    }, { rootMargin: '300px' }).observe(tv); } }
+
+// Defer first video load until results section approaches viewport
+{ let _done = false;
+  new IntersectionObserver(es => {
+    if (es[0].isIntersecting && !_done) { _done = true; selectResult(0, 0); }
+  }, { rootMargin: '400px' }).observe(document.getElementById('results')); }
+
+// ---- VR ----
+const vrVideos = [
+  { file: "vr_video_3x_custom_room4.mp4",           name: "Room 4 (VR)" },
+  { file: "vr_video_3x_custom_cartoon_simpson.mp4", name: "Cartoon Simpson (VR)" },
+  { file: "vr_video_3x_custom_room1.mp4",           name: "Custom Room 1 (VR)" },
+];
+const vrList = document.getElementById('vr-list');
+// Create placeholder cards immediately (layout), inject videos only when section is near viewport
+vrVideos.forEach(() => {
+  const c = document.createElement('div');
+  c.className = 'vr-card';
+  c.innerHTML = '<div class="vr-card-loading"><div class="v3d-spinner"></div><span>Loading…</span></div>';
+  vrList.appendChild(c);
+});
+{ let _vrDone = false;
+  new IntersectionObserver(es => {
+    if (es[0].isIntersecting && !_vrDone) {
+      _vrDone = true;
+      vrList.querySelectorAll('.vr-card').forEach((card, i) => {
+        const vid = document.createElement('video');
+        vid.preload = 'metadata'; vid.autoplay = true; vid.loop = true;
+        vid.muted = true; vid.playsInline = true;
+        vid.setAttribute('disablepictureinpicture', '');
+        vid.setAttribute('x-webkit-airplay', 'deny');
+        vid.style.opacity = '0'; vid.style.transition = 'opacity .3s';
+        const src = document.createElement('source');
+        src.src = `videos/vr_videos/${vrVideos[i].file}`; src.type = 'video/mp4';
+        vid.appendChild(src);
+        vid.addEventListener('canplay', () => {
+          vid.style.opacity = '1';
+          const overlay = card.querySelector('.vr-card-loading');
+          if (overlay) overlay.remove();
+        }, { once: true });
+        card.appendChild(vid);
+        vid.play().catch(() => {});
+      });
+    }
+  }, { rootMargin: '400px' }).observe(document.getElementById('vr')); }
+
+// ---- SOTA comparison carousel ----
+const compareScenes = [
+  { id: "custom_viga",                            name: "Painting",    img: "custom_viga.jpg",                            methods: ["ours","sam3d","gen3dsr","sg","dc"] },
+  { id: "custom_cartoon_simpson",                 name: "Simpson Room", img: "custom_cartoon_simpson.jpeg",                methods: ["ours","sam3d","gen3dsr","sg","dc"] },
+  { id: "custom_room1",                           name: "Room 1",      img: "custom_room1.jpeg",                          methods: ["ours","sam3d","gen3dsr","sg"] },
+  { id: "custom_room2",                           name: "Room 2",      img: "custom_room2.jpg",                           methods: ["ours","sam3d","gen3dsr","sg"] },
+  { id: "custom_room3",                           name: "Room 3",      img: "custom_room3.jpeg",                           methods: ["ours","sam3d","gen3dsr","sg","dc"] },
+  { id: "custom_room4",                           name: "Room 4",      img: "custom_room4.jpeg",                           methods: ["ours","sam3d","gen3dsr","sg","dc"] },
+  { id: "custom_room5",                           name: "Room 5",      img: "custom_room5.jpg",                           methods: ["ours","sam3d","sg"] },
+  { id: "custom_room6",                           name: "Room 6",      img: "custom_room6.jpeg",                           methods: ["ours","sam3d","sg"] },
+  { id: "custom_worldlab1",                       name: "WorldLab 1",  img: "custom_worldlab1.jpg",                       methods: ["ours","sam3d","sg"] },
+  { id: "custom_worldlab2",                       name: "WorldLab 2",  img: "custom_worldlab2.jpg",                       methods: ["ours","sam3d"] },
+  { id: "replica_scan6_000013_rgb",               name: "Replica",     img: "replica_scan6_000013_rgb.jpg",               methods: ["ours","sam3d","gen3dsr","sg","dc"] },
+  { id: "scannetpp_08bbbdcc3d_DSC01130",          name: "ScanNet++ 1", img: "scannetpp_08bbbdcc3d_DSC01130.jpeg",          methods: ["ours","sam3d","gen3dsr","sg","dc"] },
+  { id: "scannetpp_1a3100752b_1fd826c9_DSC00579", name: "ScanNet++ 2", img: "scannetpp_1a3100752b_1fd826c9_DSC00579.jpeg", methods: ["ours","sam3d","gen3dsr"] },
+  { id: "scannetpp_6126572846_02dd3b53_DSC04207", name: "ScanNet++ 3", img: "scannetpp_6126572846_02dd3b53_DSC04207.jpeg", methods: ["ours","sam3d","gen3dsr","sg","dc"] },
+];
+const methodLabel = { ours:"Ours", sam3d:"SAM3D", gen3dsr:"Gen3DSR", sg:"SceneGen", dc:"DigitalCousins" };
+const RIGHT_GRID_METHODS = ["dc","gen3dsr","sg","sam3d"];
+const METHOD_AREA = { dc:'dc', gen3dsr:'g3d', sg:'sg', sam3d:'sam' };
+const cmpMount  = document.getElementById('compare-block-mount');
+const cmpThumbRow = document.getElementById('compare-thumb-row');
+const cmpDots   = document.getElementById('cmp-dots');
+let cmpIdx = 0;
+
+function methodCell(scene, m) {
+  const area = METHOD_AREA[m] || m;
+  const has = scene.methods.includes(m);
+  return `<div class="cmp-cell${has?'':' empty'}" style="grid-area:${area}">
+    <div class="cmp-media${has?'':' empty-media'}">
+      ${has
+        ? `<div class="cmp-video-loading visible"><div class="v3d-spinner"></div></div>
+           <video preload="auto" loop muted playsinline disablepictureinpicture x-webkit-airplay="deny"><source src="videos/comparison_video_results/${scene.id}/${scene.id}_${m}.mp4" type="video/mp4"></video>`
+        : `<div class="cmp-empty-text">No valid result</div>`}
+    </div>
+    <div class="cmp-label"${has?'':' style="color:var(--muted)"'}>${methodLabel[m]}</div>
+  </div>`;
+}
+
+function renderCompare(idx, dir) {
+  const prevIdx = cmpIdx;
+  cmpIdx = ((idx % compareScenes.length) + compareScenes.length) % compareScenes.length;
+  const d = dir !== undefined ? Math.sign(dir) : (cmpIdx !== prevIdx ? (cmpIdx > prevIdx ? 1 : -1) : 1);
+  const s = compareScenes[cmpIdx];
+  cmpThumbRow.querySelectorAll('.v3d-thumb').forEach((el,i) => el.classList.toggle('active', i===cmpIdx));
+  cmpDots.querySelectorAll('.dot').forEach((el,i) => el.classList.toggle('active', i===cmpIdx));
+  carouselSlide(cmpMount, d, () => {
+    cmpMount.innerHTML = `
+    <div class="compare-block">
+      <div class="cmp-cell input" style="grid-area:img">
+        <div class="cmp-media"><img src="videos/images/${s.img}" alt="Input"></div>
+        <div class="cmp-label">Input Image</div>
+      </div>
+      <div class="compare-divider"></div>
+      <div class="cmp-cell ours" style="grid-area:ours">
+        <div class="cmp-media">
+          <div class="cmp-video-loading visible"><div class="v3d-spinner"></div></div>
+          <video preload="auto" loop muted playsinline disablepictureinpicture x-webkit-airplay="deny">
+            <source src="videos/comparison_video_results/${s.id}/${s.id}_ours.mp4" type="video/mp4">
+          </video>
+        </div>
+        <div class="cmp-label">Ours</div>
+      </div>
+      ${RIGHT_GRID_METHODS.map(m => methodCell(s,m)).join('')}
+    </div>`;
+    // Wait for ALL videos ready, then play in sync (first frame shown until then)
+    _cmpLoading = true;
+    const _cmpVideos = Array.from(cmpMount.querySelectorAll('video'));
+    Promise.all(_cmpVideos.map(v =>
+      v.readyState >= 3
+        ? Promise.resolve()
+        : new Promise(resolve => v.addEventListener('canplay', resolve, { once: true }))
+    )).then(() => {
+      cmpMount.querySelectorAll('.cmp-video-loading').forEach(el => el.classList.remove('visible'));
+      _cmpVideos.forEach(v => { v.currentTime = 0; v.play().catch(() => {}); });
+      _cmpLoading = false;
+      _cmpAutoArm();  // start timer only after all videos are ready
+    });
+  });
+  // _cmpAutoArm() intentionally NOT called here — called inside .then() above
+}
+
+compareScenes.forEach((s,i) => {
+  const div = document.createElement('div');
+  div.className = 'v3d-thumb' + (i===0?' active':'');
+  div.innerHTML = `<img src="videos/images/${s.img}" alt="${s.name}" loading="lazy"><div class="thumb-label">${s.name}</div>`;
+  div.onclick = () => { _cmpUserFlipped = true; renderCompare(i); };
+  cmpThumbRow.appendChild(div);
+  const dot = document.createElement('button');
+  dot.className = 'dot'+(i===0?' active':'');
+  dot.setAttribute('aria-label', `Go to ${s.name}`);
+  dot.onclick = () => { _cmpUserFlipped = true; renderCompare(i); };
+  cmpDots.appendChild(dot);
+});
+function cmpNav(dir) { _cmpUserFlipped = true; renderCompare(cmpIdx + dir, dir); }
+document.getElementById('cmp-prev').addEventListener('click', () => cmpNav(-1));
+document.getElementById('cmp-next').addEventListener('click', () => cmpNav(1));
+document.addEventListener('keydown', e => {
+  const rect = document.getElementById('compare').getBoundingClientRect();
+  if (rect.top < window.innerHeight*.7 && rect.bottom > 0) {
+    if (e.key==='ArrowLeft') cmpNav(-1);
+    if (e.key==='ArrowRight') cmpNav(1);
+  }
+});
+let cmpTouchX = 0;
+cmpMount.addEventListener('touchstart', e => { cmpTouchX = e.changedTouches[0].screenX; });
+cmpMount.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].screenX - cmpTouchX;
+  if (Math.abs(dx) > 40) cmpNav(dx > 0 ? -1 : 1);
+});
+
+// ---- SOTA gallery zoom: click a cell to enlarge to full width, click/Esc to restore ----
+function cmpClearZoom() {
+  const block = cmpMount.querySelector('.compare-block');
+  if (!block) return;
+  block.classList.remove('has-zoom');
+  block.querySelectorAll('.v3d-zoomed').forEach(el => el.classList.remove('v3d-zoomed'));
+  _cmpAutoArm();
+}
+cmpMount.addEventListener('click', e => {
+  const cell = e.target.closest('.cmp-cell');
+  if (!cell) return;
+  const block = cmpMount.querySelector('.compare-block');
+  const wasZoomed = cell.classList.contains('v3d-zoomed');
+  cmpClearZoom();
+  if (!wasZoomed) {
+    cell.classList.add('v3d-zoomed'); block.classList.add('has-zoom');
+    clearTimeout(_cmpAutoT); _cmpAutoT = null;
+  }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') cmpClearZoom();
+});
+
+// Defer first SOTA video load until compare section approaches viewport
+{ let _done = false;
+  new IntersectionObserver(es => {
+    if (es[0].isIntersecting && !_done) { _done = true; renderCompare(0, 0); }
+  }, { rootMargin: '400px' }).observe(document.getElementById('compare')); }
+
+// ---- Pause off-screen videos + control carousel timers ----
+['results','vr','compare'].forEach(id => {
+  const sec = document.getElementById(id);
+  if (!sec) return;
+  new IntersectionObserver((entries) => {
+    const vis = entries[0].isIntersecting;
+    sec.querySelectorAll('video').forEach(v => {
+      if (vis) v.play().catch(() => {});
+      else v.pause();
+    });
+    // Carousel timer: start fresh on enter, kill on leave
+    if (id === 'results') {
+      _resultVisible = vis;
+      if (vis) _resultAutoArm();
+      else { clearTimeout(_resultAutoT); _resultAutoT = null; }
+    }
+    if (id === 'compare') {
+      _cmpVisible = vis;
+      if (vis) _cmpAutoArm();
+      else { clearTimeout(_cmpAutoT); _cmpAutoT = null; }
+    }
+  }, { rootMargin: '0px' }).observe(sec);
+});
+
+}, 0); // end deferred setup
+</script>
+
+<!-- ===== Three.js Multi-Canvas Interactive Viewer ===== -->
+<!-- Three.js is NOT loaded at page start. It's fetched only when the interactive
+     section approaches the viewport (600px before), so hero video gets full bandwidth. -->
+<script type="module">
+(async () => {
+  await new Promise(resolve => {
+    const _io = new IntersectionObserver(es => {
+      if (es[0].isIntersecting) { _io.disconnect(); resolve(); }
+    }, { rootMargin: '600px' });
+    _io.observe(document.getElementById('interactive'));
+  });
+  // Now fetch Three.js — hero video is already playing by this point
+  const THREE          = await import('three');
+  const { OrbitControls }  = await import('three/addons/controls/OrbitControls.js');
+  const { GLTFLoader }     = await import('three/addons/loaders/GLTFLoader.js');
+  const { RoomEnvironment }= await import('three/addons/environments/RoomEnvironment.js');
+
+// Per-scene knobs (all optional). Brightness/colour:
+//   env, exposure, light : multipliers on IBL / tone-mapping exposure / directional+ambient
+//   saturation, gamma    : albedo curve in the shader (sat<1 → grey; gamma<1 → lifts darks)
+//   toneMapping          : 'aces' | 'neutral' | 'none' | 'linear' | 'agx'
+//   ambient, hemi, key   : override the low directional/fill light bases
+//   boost = { <panelKey>: { exposure, env, light, saturation, gamma } }  per-method overrides
+// Camera:
+//   camDist, camPitch, sgRotate (sg panel only)
+const DEFAULT_EXPOSURE = 1.0, DEFAULT_LIGHT = 0.9, DEFAULT_CAMDIST = 1.0, DEFAULT_CAMPITCH = 0.55;
+const DEFAULT_SATURATION = 1.0;
+const DEFAULT_GAMMA = 1.0;
+const VIEWER_SCENES = [
+  { id: "custom_viga",                            name: "Painting",    img: "custom_viga.jpg",                            oursKey: "ours", env: 1.0, exposure: 1.0, light: 1.0, camDist: 0.6, camPitch: 0.55 },
+  { id: "custom_cartoon_simpson",                 name: "Simpson Room", img: "custom_cartoon_simpson.jpeg",                oursKey: "ours", env: 1.0, exposure: 1.0, light: 1, saturation: 0.9, toneMapping: 'neutral', boost: { dc: { exposure: 0.8, env: 1, light: 5 }, ours: { gamma: 0.55, saturation: 1 }, sam3d: { gamma: 0.55, saturation: 1 } }, camDist: 0.8, camPitch: 0.55, sgRotate: 165 },
+  { id: "scannetpp_08bbbdcc3d_DSC01130",          name: "ScanNet++ 1", img: "scannetpp_08bbbdcc3d_DSC01130.jpeg",          oursKey: "ours", env: 1.0, exposure: 1.3, light: 1.0, camDist: 0.7, camPitch: 0.55, sgRotate: 180 },
+  { id: "scannetpp_6126572846_02dd3b53_DSC04207", name: "ScanNet++ 2", img: "scannetpp_6126572846_02dd3b53_DSC04207.jpeg", oursKey: "ours", env: 1.0, exposure: 1.0, light: 1.0, camDist: 0.7, camPitch: 0.55 },
+  { id: "custom_room1",                           name: "Room 1",      img: "custom_room1.jpeg",                          oursKey: "ours", env: 1.0, exposure: 1.0, light: 1.0, camDist: 0.8, camPitch: 0.3, sgRotate: 90 },
+  { id: "custom_room4",                           name: "Room 4",      img: "custom_room4.jpeg",                           oursKey: "ours", env: 0.8, exposure: 1.3, light: 0.8, camDist: 0.9, camPitch: 0.95, sgRotate: 180 },
+  { id: "custom_room5",                           name: "Room 5",     img: "custom_room5.jpg",                           oursKey: "ours", env: 1.0, exposure: 1.0, light: 1.0, camDist: 0.8, camPitch: 0.1 },
+  { id: "custom_worldlab1",                       name: "WorldLab",         img: "custom_worldlab1.jpg",                   oursKey: "ours", env: 1.0, exposure: 1.4, light: 1.0, camDist: 0.8, camPitch: 0.2, sgRotate: 180 },
+  { id: "replica_scan6_000013_rgb",               name: "Replica",     img: "replica_scan6_000013_rgb.jpg",               oursKey: "ours", env: 1.0, exposure: 1.0, light: 1.0, camDist: 0.9, camPitch: 0.95 },
+];
+
+// Canvas key → {gridArea, methodKey, label}
+// methodKey=null means it uses scene.oursKey
+const PANELS = [
+  { key: 'ours',  methodKey: null,       label: 'Ours' },
+  { key: 'dc',    methodKey: 'dc',       label: 'DigitalCousins' },
+  { key: 'g3d',   methodKey: 'gen3dsr',  label: 'Gen3DSR' },
+  { key: 'sg',    methodKey: 'sg',       label: 'SceneGen' },
+  { key: 'sam3d', methodKey: 'sam3d',    label: 'SAM3D' },
+];
+
+// Per-panel renderer state
+const RS = {}; // key → { renderer, scene, camera, controls, meshes, animData }
+
+// Shared animation state
+let playing = false;
+let frame = 0;             // master clock step, 0 .. MASTER_FRAMES-1
+const MASTER_FRAMES = 60;  // fixed loop length; every panel maps its own frames onto this
+let fps = 30;
+let lastT = 0;
+let currentSceneIdx = 0;
+let loadToken = 0;   // bumped each scene switch; stale loads are discarded
+let viewerVisible = false;   // true while interactive section within 200px (for scene load/resume)
+let _v3dInView = false;      // true only when section actually in viewport (for auto-advance)
+let viewerLoaded = false;    // first scene loaded lazily on first view
+let _v3dAutoT = null;
+let _v3dUserFlipped = false;
+let _v3dLoading = false;   // true while loadScene is in progress; blocks auto-advance timer
+function _v3dAutoArm() {
+  clearTimeout(_v3dAutoT); _v3dAutoT = null;
+  if (!_v3dInView) return;
+  if (zoomedPanelKey) return;
+  if (_v3dLoading) return;
+  const delay = _v3dUserFlipped ? 30000 : 10000;
+  _v3dAutoT = setTimeout(() => { if (_v3dInView) v3dNav(1); }, delay);
+}
+
+// DOM refs
+const btnPlay    = document.getElementById('v3d-play');
+const btnReset   = document.getElementById('v3d-reset');
+const rngSpeed   = document.getElementById('v3d-speed');
+const loadMsg    = document.getElementById('v3d-loadmsg');
+const inputImg   = document.getElementById('v3d-input-img');
+const thumbRow   = document.getElementById('v3d-thumb-row');
+const v3dDots    = document.getElementById('v3d-dots');
+
+// ---- Floor grid: light, radially fading to nothing toward the edges ----
+// A finite grid (half-extent = 1) whose lines fade to the background colour
+// toward the edges via per-vertex colours. Scale it per scene; no shader.
+const GRID_BG = new THREE.Color(0xf0f2f5);   // must match scene.background
+function makeGridPlane() {
+  const half = 1, divs = 24, cell = half / (divs / 2);
+  const line = new THREE.Color(0x9aa0ab);
+  const fadeStart = half * 0.30, fadeEnd = half * 0.98;
+  const pos = [], col = [];
+  const push = (x1, z1, x2, z2) => {
+    for (const [x, z] of [[x1, z1], [x2, z2]]) {
+      pos.push(x, 0, z);
+      const t = THREE.MathUtils.clamp((Math.hypot(x, z) - fadeStart) / (fadeEnd - fadeStart), 0, 1);
+      const c = line.clone().lerp(GRID_BG, t);
+      col.push(c.r, c.g, c.b);
+    }
+  };
+  for (let i = -divs / 2; i <= divs / 2; i++) {
+    const p = i * cell;
+    push(p, -half, p, half);   // lines along Z
+    push(-half, p, half, p);   // lines along X
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ vertexColors: true }));
+}
+
+// ---- Initialize all renderers ----
+const EXPOSURE = 1.0;
+// Manual lights are low-strength fill; the RoomEnvironment IBL does the main work.
+const BASE_AMBIENT = 0.12, BASE_HEMI = 0.0, BASE_KEY = 1.3;
+const BASE_ENV = 1.0;
+let currentCamDist = DEFAULT_CAMDIST;
+let currentCamPitch = DEFAULT_CAMPITCH;
+let currentSaturation = DEFAULT_SATURATION;
+let currentGamma = DEFAULT_GAMMA;
+let currentBoost = {};
+const TONE_MAP = {
+  aces:    THREE.ACESFilmicToneMapping,
+  neutral: THREE.NeutralToneMapping ?? THREE.LinearToneMapping,
+  none:    THREE.NoToneMapping,
+  linear:  THREE.LinearToneMapping,
+  agx:     THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping,
+};
+let currentToneMapping = THREE.ACESFilmicToneMapping;
+let currentSgRotate = 0;
+
+// Inject albedo gamma + saturation into a MeshStandardMaterial's shader.
+// Both default to 1.0 (no-op). Gamma operates in linear (post-sRGB-decode) space.
+function applyAlbedoCurve(mat, gamma, sat) {
+  if (gamma === 1.0 && sat === 1.0) return;
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uGamma = { value: gamma };
+    shader.uniforms.uSat   = { value: sat };
+    shader.fragmentShader =
+      'uniform float uGamma;\nuniform float uSat;\n' + shader.fragmentShader.replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+         diffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(uGamma));
+         { float _lum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+           diffuseColor.rgb = mix(vec3(_lum), diffuseColor.rgb, uSat); }`
+      );
+  };
+}
+const _nbCanvas = document.createElement('canvas');
+function textureStats(tex) {
+  try {
+    const img = tex && tex.image; if (!img) return { mean: 255, max: 255 };
+    const w = 16, h = 16; _nbCanvas.width = w; _nbCanvas.height = h;
+    const ctx = _nbCanvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, w, h);
+    const d = ctx.getImageData(0, 0, w, h).data;
+    let sum = 0, mx = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = d[i] + d[i+1] + d[i+2];
+      sum += v; if (v > mx) mx = v;
+    }
+    return { mean: sum / (w * h * 3), max: mx / 3 };
+  } catch (e) { return { mean: 255, max: 255 }; }
+}
+// True only for flat all-near-zero textures (failed baseline output, not a real dark object).
+function isBlankBlackTexture(tex) {
+  const s = textureStats(tex);
+  return s.mean < 4 && s.max < 16;
+}
+
+function initRenderers() {
+  for (const p of PANELS) {
+    const canvas = document.getElementById(`v3d-${p.key}`);
+    if (!canvas) continue;
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // ACES tone mapping rolls off highlights so bright/saturated textures (e.g. the
+    // cartoon scene) don't clip & over-saturate, while still letting us light dark
+    // scenes brightly. EXPOSURE is the single global brightness knob.
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = EXPOSURE;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const threeScene = new THREE.Scene();
+    threeScene.background = new THREE.Color(0xf0f2f5);
+    // Image-based lighting from a neutral indoor probe; environmentIntensity is set per scene.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    threeScene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+    const camera = new THREE.PerspectiveCamera(60, 16/9, 0.01, 100);
+    camera.position.set(0, 1.5, 4);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true; controls.dampingFactor = 0.1;
+    controls.target.set(0, 0.5, 0); controls.update();
+
+    // ===== Lighting =====
+    // With ACES tone mapping, the simplest global brightness control is EXPOSURE
+    // (set near the renderer above). Turn EXPOSURE up if everything is too dark,
+    // down if too bright — ACES prevents the over-saturated clipping you'd get
+    // by just cranking these light intensities.
+    //   AMBIENT = flat fill on every face   KEY = main/shadow light   HEMI = soft sky/ground fill
+    // Base intensities; each scene scales them by its `light` multiplier on load.
+    const ambientLight = new THREE.AmbientLight(0xffffff, BASE_AMBIENT);
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xaaaaaa, BASE_HEMI);
+    threeScene.add(ambientLight);
+    threeScene.add(hemiLight);
+    // Main shadow-casting key light from above
+    const dir1 = new THREE.DirectionalLight(0xffffff, BASE_KEY);
+    dir1.position.set(4, 10, 4);
+    dir1.castShadow = true;
+    dir1.shadow.mapSize.set(2048, 2048);
+    dir1.shadow.camera.left = -10; dir1.shadow.camera.right = 10;
+    dir1.shadow.camera.top = 10;   dir1.shadow.camera.bottom = -10;
+    dir1.shadow.camera.near = 0.1; dir1.shadow.camera.far = 30;
+    dir1.shadow.bias = -0.0008;
+    dir1.shadow.normalBias = 0.02;
+    threeScene.add(dir1);
+    threeScene.add(dir1.target);   // required so light.target.position changes take effect
+    // Fill lights (no shadow)
+    const dir2 = new THREE.DirectionalLight(0xffffff, 0.25);
+    dir2.position.set(-3, 3, -3); threeScene.add(dir2);
+    const dir3 = new THREE.DirectionalLight(0xffffff, 0.15);
+    dir3.position.set(0, -2, 2); threeScene.add(dir3);
+
+    // Shadow catcher — repositioned to scene floor after each load
+    const shadowGround = new THREE.Mesh(
+      new THREE.PlaneGeometry(40, 40),
+      new THREE.ShadowMaterial({ opacity: 0.5, transparent: true })
+    );
+    shadowGround.rotation.x = -Math.PI / 2;
+    shadowGround.position.y = 0;
+    shadowGround.receiveShadow = true;
+    threeScene.add(shadowGround);
+    const grid = makeGridPlane();
+    threeScene.add(grid);
+
+    RS[p.key] = { renderer, scene: threeScene, camera, controls, meshes: {}, animData: null,
+                  light: dir1, ambientLight, hemiLight, shadowGround, grid };
+    syncSize(p.key);
+  }
+
+  // ResizeObserver
+  const ro = new ResizeObserver(() => { for (const p of PANELS) syncSize(p.key); });
+  document.querySelectorAll('.v3d-canvas').forEach(c => ro.observe(c));
+}
+
+function syncSize(key) {
+  const s = RS[key]; if (!s) return;
+  const canvas = s.renderer.domElement;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (w > 0 && h > 0) {
+    s.renderer.setSize(w, h, false);
+    s.camera.aspect = w / h;
+    s.camera.updateProjectionMatrix();
+  }
+}
+
+// ---- Shared RAF loop ----
+function animate(now) {
+  requestAnimationFrame(animate);
+
+  // Skip all rendering + the playback timer while the section is off-screen,
+  // so CPU/GPU isn't spent on a viewer the user isn't looking at.
+  if (!viewerVisible) return;
+
+  if (playing) {
+    const speed = parseFloat(rngSpeed.value) || 1;
+    if (now - lastT >= 1000 / (fps * speed)) {
+      frame = (frame + 1) % MASTER_FRAMES;
+      applyFrame(frame);
+      lastT = now;
+    }
+  }
+
+  for (const p of PANELS) {
+    const s = RS[p.key]; if (!s) continue;
+    s.controls.update();
+    const w = s.renderer.domElement.clientWidth;
+    const h = s.renderer.domElement.clientHeight;
+    if (w > 0 && h > 0) s.renderer.render(s.scene, s.camera);
+  }
+}
+
+function applyFrame(masterIdx) {
+  // Normalize master progress [0,1) then map onto each panel's own frame count,
+  // so a 481-frame clip and a 61-frame clip finish together (long ones subsample).
+  const t = masterIdx / MASTER_FRAMES;
+  for (const p of PANELS) {
+    const s = RS[p.key]; if (!s?.animData) continue;
+    const n = s.animData.n_frames || 1;
+    const idx = Math.min(n - 1, Math.floor(t * n));
+    const tracks = s.animData.tracks;
+    for (const [name, mesh] of Object.entries(s.meshes)) {
+      const track = tracks[name]; if (!track) continue;
+      const pos = track.pos[idx], q = track.quat[idx];
+      if (pos) mesh.position.set(pos[0], pos[1], pos[2]);
+      if (q) mesh.quaternion.set(q[1], q[2], q[3], q[0]);
+    }
+  }
+}
+
+// ---- Load scene ----
+function setSpinner(key, on) {
+  const el = document.getElementById(`spin-${key}`);
+  if (!el) return;
+  el.classList.toggle('on', on);
+  if (on) {
+    el.classList.remove('no-result');
+    el.style.cssText = '';
+    el.innerHTML = '';
+    // Restore method label color (cleared if it was greyed by a no-result state)
+    const label = el.closest('.cmp-cell')?.querySelector('.cmp-label');
+    if (label) label.style.color = '';
+  }
+}
+function clearMeshes(key) {
+  const s = RS[key]; if (!s) return;
+  for (const m of Object.values(s.meshes)) s.scene.remove(m);
+  s.meshes = {}; s.animData = null;
+}
+
+const gltfLoader = new GLTFLoader();
+
+async function loadScene(sceneIdx, dir) {
+  const _prevIdx = currentSceneIdx;
+  currentSceneIdx = sceneIdx;
+  const sc = VIEWER_SCENES[sceneIdx];
+  const myToken = ++loadToken;   // invalidate any in-flight loads
+  const _d = dir !== undefined ? Math.sign(dir) : (sceneIdx !== _prevIdx ? (sceneIdx > _prevIdx ? 1 : -1) : 1);
+  const _animate = _d !== 0;
+  const _v3dBlock = document.getElementById('v3d-block');
+  // Use inline style (never CSS animation classes) so there's no "snap to default" on removal
+  _v3dBlock.classList.remove('csl-out-l','csl-out-r','csl-in-r','csl-in-l');
+  _v3dBlock.style.transition = '';
+  if (_animate) _v3dBlock.style.opacity = '0'; // hide immediately, stays at 0 until in-transition
+
+  // Update scene thumbnail + dot highlight (scope to the viewer's thumb row)
+  thumbRow.querySelectorAll('.v3d-thumb').forEach((el,i) => el.classList.toggle('active', i===sceneIdx));
+  v3dDots.querySelectorAll('.dot').forEach((el,i) => el.classList.toggle('active', i===sceneIdx));
+
+  // Apply this scene's per-case knobs to every panel: exposure, light, camDist
+  const exposure = sc.exposure ?? DEFAULT_EXPOSURE;
+  const lightMul = sc.light ?? DEFAULT_LIGHT;
+  currentCamDist = sc.camDist ?? DEFAULT_CAMDIST;
+  currentCamPitch = sc.camPitch ?? DEFAULT_CAMPITCH;
+  currentSgRotate = sc.sgRotate ?? 0;
+  currentSaturation = sc.saturation ?? DEFAULT_SATURATION;
+  currentGamma      = sc.gamma      ?? DEFAULT_GAMMA;
+  currentBoost = sc.boost || {};
+  currentToneMapping = TONE_MAP[sc.toneMapping] ?? THREE.ACESFilmicToneMapping;
+  const envI  = sc.env ?? BASE_ENV;
+  const ambI  = (sc.ambient ?? BASE_AMBIENT) * lightMul;
+  const hemiI = (sc.hemi ?? BASE_HEMI) * lightMul;
+  const keyI  = (sc.key ?? BASE_KEY) * lightMul;
+  for (const p of PANELS) {
+    const s = RS[p.key]; if (!s) continue;
+    const b = (sc.boost && sc.boost[p.key]) || {};   // per-method overrides
+    s.renderer.toneMapping = currentToneMapping;
+    s.renderer.toneMappingExposure = exposure * (b.exposure ?? 1);
+    s.scene.environmentIntensity = envI * (b.env ?? 1);
+    s.ambientLight.intensity = ambI * (b.light ?? 1);
+    s.hemiLight.intensity    = hemiI * (b.light ?? 1);
+    s.light.intensity        = keyI * (b.light ?? 1);
+  }
+
+  // Update input image
+  inputImg.src = `videos/images/${sc.img}`;
+
+  // Stop & reset (clear zoom before loading new scene)
+  playing = false; frame = 0; fps = 30;
+  btnPlay.textContent = '▶ Play'; btnPlay.classList.remove('active');
+  document.getElementById('v3d-play-prompt').classList.remove('visible');
+  if (zoomedPanelKey) {
+    document.querySelectorAll('.cmp-cell.v3d-zoomed').forEach(el => el.classList.remove('v3d-zoomed'));
+    v3dBlock.classList.remove('has-zoom');
+    zoomedPanelKey = null;
+  }
+  _v3dLoading = true;
+  loadMsg.textContent = 'Loading…';
+  document.getElementById('v3d-center-loading').classList.add('visible');
+
+  // Show spinners, clear old meshes immediately
+  for (const p of PANELS) { setSpinner(p.key, true); clearMeshes(p.key); }
+
+  // Load all panels in parallel
+  await Promise.all(PANELS.map(p => {
+    const methodKey = p.methodKey ?? sc.oursKey;
+    return loadPanel(p.key, sc.id, methodKey, myToken);
+  }));
+
+  // A newer scene switch happened while we were loading — abandon this one
+  if (myToken !== loadToken) return;
+
+  // Hide spinners and center overlay
+  _v3dLoading = false;
+  for (const p of PANELS) setSpinner(p.key, false);
+  loadMsg.textContent = '';
+  document.getElementById('v3d-center-loading').classList.remove('visible');
+  if (_animate) {
+    // Slide in from right (forward) or left (backward) via CSS transition — no animation class removal
+    const startX = _d >= 0 ? '72px' : '-72px';
+    _v3dBlock.style.transform = `translateX(${startX}) scale(.97)`;
+    requestAnimationFrame(() => {
+      _v3dBlock.style.transition = 'opacity .28s ease-out, transform .28s ease-out';
+      _v3dBlock.style.opacity = '';   // clears inline → defaults to 1, transition fires
+      _v3dBlock.style.transform = ''; // clears inline → defaults to none, transition fires
+      setTimeout(() => { _v3dBlock.style.transition = ''; }, 280);
+    });
+  } else {
+    _v3dBlock.style.opacity = '';
+    _v3dBlock.style.transform = '';
+  }
+  // Position meshes at frame 0 FIRST, then drop the shadow ground to the
+  // resulting floor (bbox depends on the posed meshes, not their rest pose)
+  applyFrame(0);
+  let maxR = 0;
+  for (const p of PANELS) maxR = Math.max(maxR, panelRadius(p.key));
+  for (const p of PANELS) { placeGround(p.key, maxR); frameCamera(p.key); }
+
+  // Show "Play Physics & Interact" prompt — user clicks to start
+  document.getElementById('v3d-play-prompt').classList.add('visible');
+  _v3dAutoArm();
+}
+
+// Bounding box of a panel's posed meshes (skips outliers parked far below).
+function sceneBox(key) {
+  const s = RS[key]; if (!s) return null;
+  const box = new THREE.Box3(); let any = false;
+  for (const m of Object.values(s.meshes)) {
+    const mb = new THREE.Box3().setFromObject(m);
+    if (mb.isEmpty() || mb.min.y < -50) continue;   // skip e.g. unplaced floor at y≈-100
+    box.union(mb); any = true;
+  }
+  return any ? box : null;
+}
+
+// Bounding-sphere radius of a panel's posed meshes (0 if none).
+function panelRadius(key) {
+  const box = sceneBox(key); if (!box) return 0;
+  return Math.max(box.getBoundingSphere(new THREE.Sphere()).radius, 0.2);
+}
+
+// Drop the shadow-catcher + grid to the scene floor, scale the grid to a SHARED
+// size (so all panels match), and aim the key light at the scene center.
+function placeGround(key, gridRadius) {
+  const s = RS[key]; if (!s) return;
+  const box = sceneBox(key); if (!box) return;
+  const floorY = box.min.y + 0.001;
+  const c = new THREE.Vector3(); box.getCenter(c);
+  s.shadowGround.position.set(c.x, floorY, c.z);
+  if (s.grid) {
+    s.grid.position.set(c.x, floorY, c.z);
+    s.grid.scale.setScalar(Math.max(gridRadius, 0.2) * 2.6);   // grid extends ~2.6× past the objects
+  }
+  if (s.light) { s.light.target.position.copy(c); s.light.target.updateMatrixWorld(); }
+}
+
+// Frame the camera to fill the panel: keep the replay viewing direction but set
+// the distance from the bbox (× the scene's camDist). Called on load AND on zoom
+// (so an enlarged panel re-fits to its new aspect) — does NOT move the grid.
+function frameCamera(key) {
+  const s = RS[key]; if (!s) return;
+  // Lock the bbox at load (frame 0); some animations fling objects far away and
+  // a zoom-reframe with the inflated bbox would push the camera too far out.
+  if (!s.fitBox) s.fitBox = sceneBox(key);
+  const box = s.fitBox; if (!box) return;
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const r = Math.max(sphere.radius, 0.2);
+  const fov = (s.camera.fov || 60) * Math.PI / 180;
+  const dist = (r / Math.sin(fov / 2)) * 0.8 * currentCamDist;   // smaller = closer
+  const dir = s.camera.position.clone().sub(s.controls.target);
+  if (dir.lengthSq() < 1e-6) dir.set(0, 0.4, 1);  // fallback direction
+  dir.normalize();
+  // camPitch + sgRotate apply once per load; zoom re-fits just keep the current direction.
+  if (!s.viewInit) {
+    dir.y *= currentCamPitch;
+    dir.normalize();
+    if (key === 'sg' && currentSgRotate) {
+      dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), currentSgRotate * Math.PI / 180);
+    }
+    s.viewInit = true;
+  }
+  s.controls.target.copy(sphere.center);
+  s.camera.position.copy(sphere.center).addScaledVector(dir, dist);
+  s.camera.near = Math.max(dist / 100, 0.01);
+  s.camera.far = dist * 10;
+  s.camera.updateProjectionMatrix();
+  s.controls.update();
+}
+
+
+async function loadPanel(panelKey, sceneId, methodKey, token) {
+  const s = RS[panelKey]; if (!s) return;
+  try {
+    const animUrl = `assets/${sceneId}/${methodKey}/simulation.json`;
+    const resp = await fetch(animUrl);
+    if (token !== loadToken) return;          // stale
+    if (!resp.ok) {
+      showPanelNoResult(panelKey);
+      return;
+    }
+    const animData = await resp.json();
+    if (token !== loadToken) return;          // stale
+    s.animData = animData;
+    s.viewInit = false;   // frameCamera will re-establish direction + bbox once per load
+    s.fitBox = null;
+
+    if (animData.camera) {
+      const { position: pos, target, fov } = animData.camera;
+      s.camera.position.set(pos[0], pos[1], pos[2]);
+      s.controls.target.set(target[0], target[1], target[2]);
+      s.camera.fov = fov || 60; s.camera.updateProjectionMatrix();
+      s.controls.update();
+    }
+
+    await Promise.all(animData.actors.map(name => new Promise(resolve => {
+      const url = `assets/${sceneId}/${methodKey}/meshes/${encodeURIComponent(name)}.glb`;
+      gltfLoader.load(url,
+        gltf => {
+          if (token !== loadToken) { resolve(); return; }   // stale, discard
+          gltf.scene.traverse(child => {
+            if (child.isMesh && child.material) {
+              if (!child.geometry.attributes.normal) child.geometry.computeVertexNormals();
+              let map = child.material.map || null;
+              if (map && isBlankBlackTexture(map)) map = null;   // failed-texture → grey fallback
+              if (map) {
+                map.colorSpace = THREE.SRGBColorSpace;
+                map.anisotropy = s.renderer.capabilities.getMaxAnisotropy();
+                map.minFilter = THREE.LinearMipmapLinearFilter;
+                map.generateMipmaps = true;
+                map.needsUpdate = true;
+              }
+              const vc = !!child.geometry.attributes.color;
+              const mat = new THREE.MeshStandardMaterial({
+                map, vertexColors: vc,
+                color: (map || vc) ? 0xffffff : 0xb0b0b0,
+                roughness: 1.0, metalness: 0.0,
+                side: THREE.DoubleSide,
+              });
+              applyAlbedoCurve(
+                mat,
+                currentBoost[panelKey]?.gamma      ?? currentGamma,
+                currentBoost[panelKey]?.saturation ?? currentSaturation,
+              );
+              child.material = mat;
+              child.castShadow = true;
+              child.receiveShadow = false;   // ground-only shadow receiver → no self-shadow acne
+            }
+          });
+          gltf.scene.name = name; s.scene.add(gltf.scene); s.meshes[name] = gltf.scene; resolve();
+        },
+        undefined,
+        err => { console.warn(`[v3d] mesh load failed: ${name}`, err); resolve(); }
+      );
+    })));
+  } catch(e) { console.error(`[v3d] loadPanel ${panelKey} error:`, e); showPanelError(panelKey, 'Error'); }
+}
+
+function showPanelError(panelKey, msg) {
+  const spin = document.getElementById(`spin-${panelKey}`);
+  if (!spin) return;
+  spin.classList.add('on');
+  spin.style.cssText = 'display:flex; background:rgba(240,242,245,.9);';
+  spin.innerHTML = `<span style="font-size:.85em;color:var(--muted);font-family:sans-serif">${msg}</span>`;
+}
+
+function showPanelNoResult(panelKey) {
+  const spin = document.getElementById(`spin-${panelKey}`);
+  if (!spin) return;
+  spin.classList.add('on', 'no-result');
+  // Match the SOTA comparison section's empty styling exactly
+  spin.style.cssText = 'display:flex; background:#ececec;';
+  spin.innerHTML = `<div class="cmp-empty-text">No valid result</div>`;
+  // Grey out the method label, like the SOTA empty cells
+  const label = spin.closest('.cmp-cell')?.querySelector('.cmp-label');
+  if (label) label.style.color = 'var(--muted)';
+}
+
+// ---- Build scene thumbnails + dots ----
+function buildThumbs() {
+  VIEWER_SCENES.forEach((sc, i) => {
+    const div = document.createElement('div');
+    div.className = 'v3d-thumb' + (i===0?' active':'');
+    div.innerHTML = `<img src="videos/images/${sc.img}" alt="${sc.name}" loading="lazy"><div class="thumb-label">${sc.name}</div>`;
+    div.onclick = () => { _v3dUserFlipped = true; loadScene(i); };
+    thumbRow.appendChild(div);
+    const dot = document.createElement('button');
+    dot.className = 'dot' + (i===0?' active':'');
+    dot.setAttribute('aria-label', `Go to ${sc.name}`);
+    dot.onclick = () => { _v3dUserFlipped = true; loadScene(i); };
+    v3dDots.appendChild(dot);
+  });
+}
+function v3dNav(dir, manual=false) {
+  if (manual) _v3dUserFlipped = true;
+  const n = VIEWER_SCENES.length;
+  loadScene(((currentSceneIdx + dir) % n + n) % n, dir);
+}
+document.getElementById('v3d-prev').addEventListener('click', () => v3dNav(-1, true));
+document.getElementById('v3d-next').addEventListener('click', () => v3dNav(1, true));
+
+// ---- Controls ----
+function _v3dStartPlay() {
+  document.getElementById('v3d-play-prompt').classList.remove('visible');
+  playing = true;
+  btnPlay.textContent = '⏸ Pause'; btnPlay.classList.add('active');
+  lastT = performance.now();
+}
+document.getElementById('v3d-play-prompt-btn').addEventListener('click', _v3dStartPlay);
+btnPlay.addEventListener('click', () => {
+  document.getElementById('v3d-play-prompt').classList.remove('visible');
+  playing = !playing;
+  btnPlay.textContent = playing ? '⏸ Pause' : '▶ Play';
+  btnPlay.classList.toggle('active', playing);
+  if (playing) lastT = performance.now();
+});
+btnReset.addEventListener('click', () => {
+  playing = false; frame = 0;
+  btnPlay.textContent = '▶ Play'; btnPlay.classList.remove('active');
+  applyFrame(0);
+});
+
+// ---- Panel zoom: click to enlarge, click again or Space to restore ----
+const v3dBlock = document.getElementById('v3d-block');
+let zoomedPanelKey = null;
+
+function setZoom(panelKey) {
+  _v3dUserFlipped = true;
+  // toggle: same key clicked again → exit
+  if (zoomedPanelKey === panelKey) panelKey = null;
+  // clear previous
+  document.querySelectorAll('.cmp-cell.v3d-zoomed').forEach(el => el.classList.remove('v3d-zoomed'));
+  v3dBlock.classList.remove('has-zoom');
+  zoomedPanelKey = panelKey;
+  if (panelKey) {
+    const canvas = document.getElementById(`v3d-${panelKey}`);
+    const cell = canvas?.closest('.cmp-cell');
+    if (cell) { cell.classList.add('v3d-zoomed'); v3dBlock.classList.add('has-zoom'); }
+    clearTimeout(_v3dAutoT); _v3dAutoT = null;
+  } else {
+    _v3dAutoArm();
+  }
+  // Resize, then re-frame each panel's camera to its new aspect so the
+  // enlarged panel actually shows a bigger, well-fit view (grid stays put).
+  setTimeout(() => {
+    for (const p of PANELS) syncSize(p.key);
+    for (const p of PANELS) frameCamera(p.key);
+  }, 60);
+}
+
+// Detect click-vs-drag on each canvas — only a click (no movement) toggles zoom
+for (const p of PANELS) {
+  const canvas = document.getElementById(`v3d-${p.key}`);
+  if (!canvas) continue;
+  let downX = 0, downY = 0, downT = 0;
+  canvas.addEventListener('pointerdown', e => {
+    downX = e.clientX; downY = e.clientY; downT = performance.now();
+  });
+  canvas.addEventListener('pointerup', e => {
+    const dx = e.clientX - downX, dy = e.clientY - downY;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 5 && (performance.now() - downT) < 350) {
+      setZoom(p.key);
+    }
+  });
+}
+
+// Input Image cell: simple click toggles zoom (no drag-vs-click needed, no controls)
+const _inputCell = document.getElementById('v3d-input-img')?.closest('.cmp-cell');
+if (_inputCell) _inputCell.addEventListener('click', () => setZoom('input-img'));
+
+// Arrow keys navigate scenes; Space/Esc exits zoom
+document.addEventListener('keydown', e => {
+  const rect = document.getElementById('interactive').getBoundingClientRect();
+  const inView = rect.top < window.innerHeight * 0.7 && rect.bottom > 0;
+  if (inView) {
+    // Space: trigger Run Simulation if prompt is visible (takes priority over other bindings)
+    if (e.code === 'Space' && document.getElementById('v3d-play-prompt').classList.contains('visible')) {
+      e.preventDefault(); _v3dStartPlay(); return;
+    }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); v3dNav(-1, true); return; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); v3dNav(1,  true); return; }
+  }
+  if (!zoomedPanelKey) return;
+  if (e.code === 'Space' || e.code === 'Escape') {
+    e.preventDefault();
+    setZoom(null);
+  }
+});
+
+// ---- Boot ----
+if (location.protocol === 'file:') {
+  document.getElementById('v3d-loadmsg').textContent =
+    '⚠ file:// not supported — run: python3 -m http.server 8000';
+}
+
+initRenderers();
+buildThumbs();
+requestAnimationFrame(animate);
+
+// Lazy-load the heavy GLBs only when the interactive section is actually viewed,
+// and pause playback while it scrolls out of view — freeing bandwidth for the
+// videos in whatever section the user is currently looking at.
+new IntersectionObserver((entries) => {
+  const vis = entries[0].isIntersecting;
+  viewerVisible = vis;
+  if (vis) {
+    if (!viewerLoaded) { viewerLoaded = true; loadScene(0, 0); }      // first view → load
+    else if (!playing && !document.getElementById('v3d-play-prompt').classList.contains('visible')) {
+      playing = true; lastT = performance.now();    // returning → resume (only if user already clicked play)
+      btnPlay.textContent = '⏸ Pause'; btnPlay.classList.add('active');
+    }
+  } else if (playing) {                                             // left view → pause
+    playing = false;
+    btnPlay.textContent = '▶ Play'; btnPlay.classList.remove('active');
+    clearTimeout(_v3dAutoT); _v3dAutoT = null;
+  }
+}, { rootMargin: '200px' }).observe(document.getElementById('interactive'));
+
+// Separate 0px observer: controls auto-advance timer (only when actually in viewport)
+new IntersectionObserver((entries) => {
+  _v3dInView = entries[0].isIntersecting;
+  if (_v3dInView) _v3dAutoArm();
+  else { clearTimeout(_v3dAutoT); _v3dAutoT = null; }
+}, { rootMargin: '0px' }).observe(document.getElementById('interactive'));
+})();
+</script>
+
+</body>
+</html>
