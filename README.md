@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://shirleymaxx.github.io/REST3D/">
+  <a href="https://arxiv.org/abs/2605.30338">
     <img src="https://img.shields.io/badge/arXiv-REST3D-d55c5c?logo=arxiv&style=flat" alt="arXiv">
   </a>
   &nbsp;
@@ -46,9 +46,9 @@
 If you find this work useful, please cite:
 ```bibtex
 @article{ma2026rest3d,
-  title={REST3D: Reconstructing Physically Stable 3D Scenes from a Single Image},
-  author={Ma, Xiaoxuan and Wang, Jiashun and Ugrinovic, Nicol{\'a}s and Litman, Yehonathan and Kitani, Kris},
-  journal={arXiv preprint},
-  year={2026}
+  title     = {REST3D: Reconstructing Physically Stable 3D Scenes from a Single Image},
+  author    = {Ma, Xiaoxuan and Wang, Jiashun and Ugrinovic, Nicol\'{a}s and Litman, Yehonathan and Kitani, Kris},
+  booktitle = {arXiv preprint arXiv:2605.30338},
+  year      = {2026}
 }
 ```
