@@ -553,11 +553,11 @@
     </div>
     <div class="hero-affil">Carnegie Mellon University</div>
     <div class="paper-links">
-      <a href="#">&#128196; arXiv</a>
-      <a href="https://github.com/ShirleyMaxx/REST3D">&#128187; Code</a>
+      <a href="https://arxiv.org/abs/2605.30338" target="_blank" rel="noopener">&#128196; arXiv</a>
+      <a href="https://github.com/ShirleyMaxx/REST3D" target="_blank" rel="noopener">&#128187; Code</a>
       <a href="#interactive">&#127918; Interactive 3D</a>
+      </div>
     </div>
-  </div>
   <div class="hero-scroll" onclick="document.getElementById('teaser').scrollIntoView({behavior:'smooth'})">
     <span>▼</span>
   </div>
@@ -747,10 +747,10 @@
 <section id="citation" class="alt-bg">
   <div class="container">
     <h2 class="section-title">Citation</h2>
-    <pre class="bibtex"><code>@inproceedings{ma2026rest3d,
+    <pre class="bibtex"><code>@article{ma2026rest3d,
   title     = {REST3D: Reconstructing Physically Stable 3D Scenes from a Single Image},
   author    = {Ma, Xiaoxuan and Wang, Jiashun and Ugrinovic, Nicol\'{a}s and Litman, Yehonathan and Kitani, Kris},
-  booktitle = {arXiv preprint arXiv:},
+  booktitle = {arXiv preprint arXiv:2605.30338},
   year      = {2026}
 }</code></pre>
   </div>
@@ -931,9 +931,9 @@ ourResults.forEach((r, i) => {
 
 // ---- VR ----
 const vrVideos = [
+  { file: "vr_video_3x_custom_room1.mp4",           name: "Custom Room 1 (VR)" },
   { file: "vr_video_3x_custom_room4.mp4",           name: "Room 4 (VR)" },
   { file: "vr_video_3x_custom_cartoon_simpson.mp4", name: "Cartoon Simpson (VR)" },
-  { file: "vr_video_3x_custom_room1.mp4",           name: "Custom Room 1 (VR)" },
 ];
 const vrList = document.getElementById('vr-list');
 // Create placeholder cards immediately (layout), inject videos only when section is near viewport
