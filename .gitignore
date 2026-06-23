@@ -1,0 +1,26 @@
+# Packaging / build artifacts
+*.egg-info/
+build/
+dist/
+
+# Pipeline outputs
+output/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+
+# Cloned upstream deps (installed editable; large)
+third_party_src/
